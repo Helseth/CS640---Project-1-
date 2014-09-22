@@ -12,7 +12,7 @@ import java.nio.ByteBuffer;
 // Pinger.java
 // Description: Pings stuff (working desc)
 /////////////////////////////////////////////////////////////
-public class pinger {
+public class Pinger {
 
 	public static void main(String[] args) throws Exception {
 		
