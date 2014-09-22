@@ -2,7 +2,6 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 
@@ -22,7 +21,7 @@ public class Pinger {
 		boolean clientMode = false;	//if true = client; false = server
 		
 		//Check to see if there is either 9 parameters for client or 3 for server
-		if (args.length != 8 && args.length != 2){
+		if ((args.length != 8 && args.length != 2) || (args.length != 2 && args.length != 8)){
 			System.out.println("Error: missing or additional arguments");
 			return;
 		}
@@ -54,6 +53,7 @@ public class Pinger {
 	// Method for acting as the client pinger
 	/////////////////////////////////////////
 	static void clientPing(String hostname, int port, int pktCount) throws Exception{
+		byte[] inBuffer = new byte[12];
 		//open a datagram socket to send ping
 		DatagramSocket clientSocket = new DatagramSocket();
 		
@@ -91,9 +91,8 @@ public class Pinger {
 	 		DatagramPacket inPkt = null;
 	 		
 	 		try {
-	 			clientSocket.receive(inPkt);
-	 			
-	 			byte[] inBuffer = inPkt.getData();
+	 			clientSocket.receive(inPkt);	 			
+	 			inBuffer = inPkt.getData();
 	 			ByteBuffer inTimeStamp = ByteBuffer.wrap(inBuffer, 4, 8);
 	 			long inTime = inTimeStamp.getLong();
 	
