@@ -1,6 +1,8 @@
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 
@@ -43,7 +45,7 @@ public class Pinger {
 		if (clientMode)
 			clientPing(hostname, remotePort, pktCount);
 		else
-			serverPing();
+			serverPing(localPort);
 		
 		return;
 	}
@@ -56,7 +58,7 @@ public class Pinger {
 		DatagramSocket clientSocket = new DatagramSocket();
 		
 		//Find the address we are sending to
- 		InetSocketAddress address = new InetSocketAddress(hostname, port);
+ 		InetSocketAddress address = new InetSocketAddress(InetAddress.getByName(hostname), port);
 		
 		//Bind the port to the remote address
  		clientSocket.bind(address);
@@ -110,9 +112,31 @@ public class Pinger {
 	//////////////////////////////////////////////////
 	// Method for acting as the server being pinged
 	////////////////////////////////////////////////
-	static void serverPing(){
-		
-		return;
+	static void serverPing(int localPort) throws Exception{
+		DatagramSocket serverSocket = new DatagramSocket(localPort); //I guess this won't close because we never exit the loop
+		int i = 0;
+		while(true){
+			byte[] receiveData = new byte[12]; //Packet we get from client
+			byte[] sendData = new byte[12];
+			DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+			serverSocket.receive(receivePacket);
+			byte[] seq = ByteBuffer.allocate(4).putInt(1+i).array();
+			long outTime = System.currentTimeMillis();
+	 		byte[] timeStamp = ByteBuffer.allocate(8).putLong(outTime).array();
+	 		
+	 		//Slot in the bytes we created to the buffer
+	 		for (int j = 0 ; j < 12 ; j++){
+	 			if (j < 4)
+	 				sendData[j] = seq[j];
+	 			else
+	 				sendData[j] = timeStamp[j];
+	 		}
+			String sentence = new String( receivePacket.getData());
+            System.out.println("RECEIVED: " + sentence);
+            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, receivePacket.getAddress(), receivePacket.getPort());
+            serverSocket.send(sendPacket);
+            i++;
+		}
 	}
 
 }
