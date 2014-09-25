@@ -11,21 +11,17 @@ import java.nio.ByteBuffer;
 // Description: Pings stuff (working desc)
 /////////////////////////////////////////////////////////////
 public class Pinger {
-
 	public static void main(String[] args) throws Exception {
-		
-		int localPort = 0;			//determines our port
-		int remotePort = 0;			//determines destination port
-		String hostname = "";		//determines the name of the remote port
-		int pktCount = 0;			//determines the amount of packets we send
+		int localPort = 0;	//determines our port
+		int remotePort = 0;	//determines destination port
+		String hostname = "";	//determines the name of the remote port
+		int pktCount = 0;	//determines the amount of packets we send
 		boolean clientMode = false;	//if true = client; false = server
-		
 		//Check to see if there is either 9 parameters for client or 3 for server
 		if ((args.length != 8 && args.length != 2) || (args.length != 2 && args.length != 8)){
 			System.out.println("Error: missing or additional arguments");
 			return;
 		}
-		
 		//assign parameters to class variables
 		for (int i = 0; i < args.length; i++){
 			if (args[i].contains("-l"))
@@ -39,16 +35,13 @@ public class Pinger {
 				clientMode = true;
 			}
 		}
-		
 		//base next action on whether or not we are the client
 		if (clientMode)
 			clientPing(hostname, remotePort, pktCount);
 		else
 			serverPing(localPort);
-		
 		return;
 	}
-	
 	///////////////////////////////////////////
 	// Method for acting as the client pinger
 	/////////////////////////////////////////
@@ -58,84 +51,105 @@ public class Pinger {
 		DatagramSocket clientSocket = new DatagramSocket();
 		
 		//Find the address we are sending to
- 		InetSocketAddress address = new InetSocketAddress(InetAddress.getByName(hostname), port);
+		InetSocketAddress address = new InetSocketAddress(InetAddress.getByName(hostname), port);
 		
 		//Bind the port to the remote address
- 		clientSocket.bind(address);
- 		
- 		//Set the timeout period on the socket to 10 seconds
- 		clientSocket.setSoTimeout(10000);
+		//clientSocket.bind(address);
 		
- 		for (int i = 0; i < pktCount; i++){
+		//Set the timeout period on the socket to 10 seconds
+		clientSocket.setSoTimeout(10000);
+		
+		for (int i = 0; i < pktCount; i++){
 			//create the byte strings to send on our ping
 			byte[] buffer = new byte[12];
 			byte[] seq = ByteBuffer.allocate(4).putInt(1+i).array();
 			long outTime = System.currentTimeMillis();
-	 		byte[] timeStamp = ByteBuffer.allocate(8).putLong(outTime).array();
-	 		
-	 		//Slot in the bytes we created to the buffer
-	 		for (int j = 0 ; j < 12 ; j++){
-	 			if (j < 4)
-	 				buffer[j] = seq[j];
-	 			else
-	 				buffer[j] = timeStamp[j];
-	 		}
-	 		
-	 		//Make our datagram packet to send
-	 		DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+			//System.out.println(outTime);
+			byte[] timeStamp = ByteBuffer.allocate(8).putLong(outTime).array();
 			
-	 		//Send the completed packet
-	 		clientSocket.send(packet);
-	 		
-	 		//Creates a datagram packet so we can receive the server packet
-	 		DatagramPacket inPkt = null;
-	 		
-	 		try {
-	 			clientSocket.receive(inPkt);	 			
-	 			inBuffer = inPkt.getData();
-	 			ByteBuffer inTimeStamp = ByteBuffer.wrap(inBuffer, 4, 8);
-	 			long inTime = inTimeStamp.getLong();
-	
-	 			System.out.println("rtt= " + Long.toString(inTime - outTime) + " ms");
-	 		} catch (SocketTimeoutException e) {
-	 			System.out.println("rtt= TIMEOUT ERROR");
-	 		}
- 		}
- 		
- 		//Close the socket when we are done sending
- 		clientSocket.close();
-		
- 		return;
+			//Slot in the bytes we created to the buffer
+			for (int j = 0 ; j < 12 ; j++){
+				if (j < 4)
+					buffer[j] = seq[j];
+				else
+					buffer[j] = timeStamp[j-4];
+			}
+			//Make our datagram packet to send
+			DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address);
+			
+			//Send the completed packet
+			clientSocket.send(packet);
+			
+			//Creates a datagram packet so we can receive the server packet
+			DatagramPacket inPkt = new DatagramPacket(inBuffer, inBuffer.length);
+			
+			try {
+				clientSocket.receive(inPkt);	
+				inBuffer = inPkt.getData();
+				ByteBuffer inTimeStamp = ByteBuffer.wrap(inBuffer, 4, 8);
+				long inTime = inTimeStamp.getLong();
+				int inSize = inPkt.getLength();
+				InetAddress inAddress = inPkt.getAddress();
+				System.out.print("size=" + inSize);
+				System.out.print(" from=" + inAddress.toString().substring(1));
+				System.out.print(" seq=" + i);
+				System.out.println(" rtt=" + Long.toString(inTime - outTime) + " ms");
+			} catch (SocketTimeoutException e) {
+				System.out.println("rtt=TIMEOUT ERROR");
+			}
+		}
+		//Close the socket when we are done sending
+		clientSocket.close();
+		return;
 	}
-	
 	//////////////////////////////////////////////////
 	// Method for acting as the server being pinged
 	////////////////////////////////////////////////
 	static void serverPing(int localPort) throws Exception{
+		
 		DatagramSocket serverSocket = new DatagramSocket(localPort); //I guess this won't close because we never exit the loop
 		int i = 0;
+		
+		//main server loop
 		while(true){
 			byte[] receiveData = new byte[12]; //Packet we get from client
 			byte[] sendData = new byte[12];
+			
+			//create a receive packet and wait until you receive one
 			DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 			serverSocket.receive(receivePacket);
+			
+			//create a return packet for the sender
 			byte[] seq = ByteBuffer.allocate(4).putInt(1+i).array();
 			long outTime = System.currentTimeMillis();
-	 		byte[] timeStamp = ByteBuffer.allocate(8).putLong(outTime).array();
-	 		
-	 		//Slot in the bytes we created to the buffer
-	 		for (int j = 0 ; j < 12 ; j++){
-	 			if (j < 4)
-	 				sendData[j] = seq[j];
-	 			else
-	 				sendData[j] = timeStamp[j];
-	 		}
-			String sentence = new String( receivePacket.getData());
-            System.out.println("RECEIVED: " + sentence);
-            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, receivePacket.getAddress(), receivePacket.getPort());
-            serverSocket.send(sendPacket);
-            i++;
+			byte[] timeStamp = ByteBuffer.allocate(8).putLong(outTime).array();
+			
+			//Slot in the bytes we created to the buffer
+			for (int j = 0 ; j < 12 ; j++){
+				if (j < 4)
+					sendData[j] = seq[j];
+				else
+					sendData[j] = timeStamp[j-4];
+			}
+			
+			//Prepare and output the receiving information
+			InetAddress receiveAddr = receivePacket.getAddress();
+			byte[] dataString = receivePacket.getData();
+			System.out.print("time=");
+			long value = 0;
+			for (int k = 4; k < dataString.length; k++)
+			{
+			   value = (value << 8) + (dataString[k] & 0xff);
+			}
+			System.out.print(value);
+			System.out.println(" from=" + receiveAddr.toString().substring(1) + " seq=" + i);
+			
+			//send return packet to confirm the transmission
+			DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, receivePacket.getAddress(), receivePacket.getPort());
+			serverSocket.send(sendPacket);
+			
+			//increment the seq counter
+			i++;
 		}
 	}
-
 }
